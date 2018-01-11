@@ -37,24 +37,24 @@ export default {
     this.chat = groupResponse.data.data.chat
     this.threads = groupBy(this.chat, 'uuid')
 
-    let threads = {};
+    let threads = {}
     const userNames = uniq(map(this.chat, 'user'))
     userNames.forEach(userName => {
       const messagesWithUser = this.chat.filter(message => {
-        return message.user === userName || message.text.indexOf(userName) !== -1;
-      });
-      threads[userName] = messagesWithUser;
-    });
-    this.threads = threads;
+        return message.user === userName || message.text.indexOf(userName) !== -1
+      })
+      threads[userName] = messagesWithUser
+    })
+    this.threads = threads
   },
   methods: {
     selectThread (key) {
       if (this.activeThread === key) {
         this.activeThread = ''
-        return;
+        return
       }
       this.activeThread = key
-    },
+    }
   }
 }
 </script>
