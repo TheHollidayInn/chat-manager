@@ -12,15 +12,26 @@
     div(v-for='(thread, key) in threads', v-if='activeThread === key')
       .sub-nav
         strong Actions
-        button.btn.btn-secondary(@click='archive(key, thread)') Archive
+        button.btn.btn-secondary(@click='archive(key, thread)', :disabled='loading') Archive
       .row
         .col.s12.m6
           .card(v-for='message in thread')
             .card-content
               span.card-title {{message.user}}
-              p {{message.text}}
+              strong UserID: {{message.uuid}}
+              br
+              p.message-content {{message.text}}
             .card-action
-              a(href='#') This is a link
+              a.modal-trigger(@click.prevent='reply(message)', href="#modal1") Reply
+              a.red-text.text-darken-1(@click.prevent='remove(message)') Remove
+
+  #modal1.modal
+    .modal-content
+      h4 Replying to {{messageReplyingTo.user}}
+      textarea.replyarea(v-model='replyText')
+    .modal-footer
+      a.modal-action.modal-close.waves-effect.waves-red.btn-flat.red-text.text-darken-1 Cancel
+      a.modal-action.modal-close.waves-effect.waves-green.btn-flat(@click.prevent='sendMessage()') Send
 </template>
 
 <script>
@@ -38,14 +49,16 @@ export default {
       threads: [],
       activeThread: '',
       archivedThreads: {},
-      loading: false
+      loading: false,
+      messageReplyingTo: {},
+      replyText: ''
     }
   },
   async mounted () {
     axios.defaults.headers.common['x-api-user'] = process.env.HABITICA_USER_ID
     axios.defaults.headers.common['x-api-key'] = process.env.HABITICA_API_KEY
+    this.archivedThreads = JSON.parse(localStorage.getItem('habitica-archived')) || {}
     await this.loadChat()
-    this.archivedThreads = JSON.parse(localStorage.getItem('habitica-archived')) || {};
   },
   methods: {
     selectThread (key) {
@@ -81,8 +94,28 @@ export default {
     archive (key, thread) {
       this.$set(this.archivedThreads, key, thread[0].id)
       this.activeThread = ''
-      const result = localStorage.setItem('habitica-archived', JSON.stringify(this.archivedThreads))
-      console.log(JSON.stringify(this.archivedThreads))
+      localStorage.setItem('habitica-archived', JSON.stringify(this.archivedThreads))
+    },
+    reply (message) {
+      this.$set(this, 'messageReplyingTo', message)
+      this.replyText = ''
+      this.replyText += this.messageReplyingTo.text
+      $('#modal1').modal() //  eslint-disable-line
+    },
+    async sendMessage () {
+      this.loading = true
+      await axios.post('https://habitica.com/api/v3/groups/a29da26b-37de-4a71-b0c6-48e72a900dac/chat', {
+        message: this.replyText
+      })
+      // @TODO: can we not refresh the full chat
+      await this.refresh()
+      // console.log(chatResponse)
+    },
+    async remove (message) {
+      if (!confirm('Are you sure you want to remove this message?')) return
+      this.loading = true
+      await axios.delete(`https://habitica.com/api/v3/groups/a29da26b-37de-4a71-b0c6-48e72a900dac/chat/${message.id}`)
+      await this.refresh()
     }
   }
 }
@@ -131,6 +164,10 @@ export default {
     padding-right: 0 !important;
   }
 
+  .message-content {
+    white-space: pre-wrap;
+  }
+
   .threads {
     text-align: left;
     height: 100%;
@@ -151,6 +188,14 @@ export default {
     padding: 0 1rem;
     height: auto;
     font-size: .6rem;
+  }
+
+  .card-action a:hover {
+    cursor: pointer;
+  }
+
+  .replyarea {
+    min-height: 200px;
   }
 
   h1, h2 {
